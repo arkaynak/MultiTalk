@@ -409,3 +409,6 @@ granting you the freedom to use them while ensuring that your usage complies wit
 You are fully accountable for your use of the models, which must not involve sharing any content that violates applicable laws, 
 causes harm to individuals or groups, disseminates personal information intended for harm, spreads misinformation, or targets vulnerable populations. 
 
+## Bu proje üzerinde test yapıyorum – 08.07.2025
+
+
