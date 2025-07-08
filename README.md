@@ -410,5 +410,5 @@ You are fully accountable for your use of the models, which must not involve sha
 causes harm to individuals or groups, disseminates personal information intended for harm, spreads misinformation, or targets vulnerable populations. 
 
 ## Bu proje üzerinde test yapıyorum – 08.07.2025
-
+### GitHub Desktop testi devam ediyor – 08.07.2025
 
