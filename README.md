@@ -80,10 +80,17 @@ We propose **MultiTalk** , a novel framework for audio-driven multi-person conve
 
 ## 🔥 Latest News
 
+* July 01, 2025: 🔥🔥 `MultiTalk` supports input audios with TTS, [FusioniX](https://huggingface.co/vrgamedevgirl84/Wan14BT2VFusioniX/blob/main/FusionX_LoRa/Wan2.1_I2V_14B_FusionX_LoRA.safetensors) and [lightx2v](https://huggingface.co/Kijai/WanVideo_comfy/blob/main/Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32.safetensors) LoRA acceleration (requires only 4~8 steps), and Gradio.
 * June 14, 2025: 🔥🔥 We release `MultiTalk` with support for `multi-GPU inference`, `teacache acceleration`, `APG` and `low-VRAM inference` (enabling 480P video generation on a single RTX 4090). [APG](https://arxiv.org/abs/2410.02416) is used to alleviate the color error accumulation in long video generation. TeaCache is capable of increasing speed by approximately 2~3x.
 * June 9, 2025: 🔥🔥 We release the [weights](https://huggingface.co/MeiGen-AI/MeiGen-MultiTalk) and inference code of **MultiTalk** 
 * May 29, 2025: We release the [Technique-Report](https://arxiv.org/abs/2505.22647) of **MultiTalk** 
 * May 29, 2025: We release the [project page](https://meigen-ai.github.io/multi-talk/) of **MultiTalk** 
+
+## 🌐 Community  Works
+- [Replicate](https://replicate.com/zsxkib/multitalk): thank [zsxkib](https://github.com/zsxkib) for pushing MultiTalk to Replicate platform, try it! Please refer to [cog-MultiTalk](https://github.com/zsxkib/cog-MultiTalk) for details.
+- [Gradio Demo](https://github.com/MeiGen-AI/MultiTalk): thank [fffiloni](https://github.com/fffiloni) for developing this gradio demo on Hugging Face. Please refer to the [issue](https://github.com/MeiGen-AI/MultiTalk/issues/39) for details. 
+- [ComfyUI](https://github.com/kijai/ComfyUI-WanVideoWrapper/tree/multitalk): thank [kijai](https://github.com/kijai) for integrating MultiTalk into ComfyUI-WanVideoWrapper. [Rudra](https://github.com/Rudra-ai-coder) found something interesting that MultiTalk can be combined with Wanx T2V and VACE in the [issue](https://github.com/kijai/ComfyUI-WanVideoWrapper/issues/635). 
+- [Google Colab example](https://colab.research.google.com/drive/185OyRIpJDlpnRjhBRb7FnaRlq11BLZTa?usp=sharing), an exmaple for inference on A100 provided by [Braffolk](https://github.com/Braffolk).
 
 ## 📑 Todo List
 
@@ -97,9 +104,10 @@ We propose **MultiTalk** , a novel framework for audio-driven multi-person conve
   - [ ] LCM distillation
   - [ ] Sparse Attention
 - [x] Run with very low VRAM
-- [ ] TTS integration
-- [ ] Gradio demo
+- [x] TTS integration
+- [x] Gradio demo
 - [ ] ComfyUI
+- [ ] 1.3B model
 
 ## Quick Start
 
@@ -114,10 +122,11 @@ pip install -U xformers==0.0.28 --index-url https://download.pytorch.org/whl/cu1
 ```
 #### 2. Flash-attn installation:
 ```
+pip install misaki[en]
 pip install ninja 
 pip install psutil 
 pip install packaging 
-pip install flash_attn
+pip install flash_attn==2.7.4.post1
 ```
 
 #### 3. Other dependencies
@@ -143,12 +152,15 @@ sudo yum install ffmpeg ffmpeg-devel
 | --------------|-------------------------------------------------------------------------------|-------------------------------|
 | Wan2.1-I2V-14B-480P  |      🤗 [Huggingface](https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-480P)       | Base model
 | chinese-wav2vec2-base |      🤗 [Huggingface](https://huggingface.co/TencentGameMate/chinese-wav2vec2-base)          | Audio encoder
+| Kokoro-82M      |      🤗 [Huggingface](https://huggingface.co/hexgrad/Kokoro-82M)              | TTS weights
 | MeiGen-MultiTalk      |      🤗 [Huggingface](https://huggingface.co/MeiGen-AI/MeiGen-MultiTalk)              | Our audio condition weights
 
 Download models using huggingface-cli:
 ``` sh
 huggingface-cli download Wan-AI/Wan2.1-I2V-14B-480P --local-dir ./weights/Wan2.1-I2V-14B-480P
 huggingface-cli download TencentGameMate/chinese-wav2vec2-base --local-dir ./weights/chinese-wav2vec2-base
+huggingface-cli download TencentGameMate/chinese-wav2vec2-base model.safetensors --revision refs/pr/1 --local-dir ./weights/chinese-wav2vec2-base
+huggingface-cli download hexgrad/Kokoro-82M --local-dir ./weights/Kokoro-82M
 huggingface-cli download MeiGen-AI/MeiGen-MultiTalk --local-dir ./weights/MeiGen-MultiTalk
 ```
 
@@ -186,6 +198,8 @@ Our model is compatible with both 480P and 720P resolutions. The current code on
 --size multitalk-720: generate 720P video.
 --use_apg: run with APG.
 --teacache_thresh: A coefficient used for TeaCache acceleration
+—-sample_text_guide_scale： When not using LoRA, the optimal value is 5. After applying LoRA, the recommended value is 1.
+—-sample_audio_guide_scale： When not using LoRA, the optimal value is 4. After applying LoRA, the recommended value is 2.
 ```
 
 #### 1. Single-Person
@@ -202,7 +216,6 @@ python generate_multitalk.py \
     --mode streaming \
     --use_teacache \
     --save_file single_long_exp
-
 ```
 
 ##### 2) Run with very low VRAM
@@ -220,7 +233,6 @@ python generate_multitalk.py \
     --num_persistent_param_in_dit 0 \
     --use_teacache \
     --save_file single_long_lowvram_exp
-
 ```
 
 ##### 3) Multi-GPU inference
@@ -237,9 +249,21 @@ torchrun --nproc_per_node=$GPU_NUM --standalone generate_multitalk.py \
     --mode streaming \
     --use_teacache \
     --save_file single_long_multigpu_exp
-
 ```
 
+##### 4) Run with TTS
+```
+python generate_multitalk.py \
+    --ckpt_dir weights/Wan2.1-I2V-14B-480P \
+    --wav2vec_dir 'weights/chinese-wav2vec2-base' \
+    --input_json examples/single_example_tts_1.json \
+    --sample_steps 40 \
+    --mode streaming \
+    --num_persistent_param_in_dit 0 \
+    --use_teacache \
+    --save_file single_long_lowvram_tts_exp \
+    --audio_mode tts
+```
 
 
 #### 2. Multi-Person
@@ -269,7 +293,6 @@ python generate_multitalk.py \
     --num_persistent_param_in_dit 0 \
     --use_teacache \
     --save_file multi_long_lowvram_exp
-
 ```
 
 ##### 3) Multi-GPU inference
@@ -284,8 +307,80 @@ torchrun --nproc_per_node=$GPU_NUM --standalone generate_multitalk.py \
     --sample_steps 40 \
     --mode streaming --use_teacache \
     --save_file multi_long_multigpu_exp
+```
+
+##### 4) Run with TTS
 
 ```
+python generate_multitalk.py \
+    --ckpt_dir weights/Wan2.1-I2V-14B-480P \
+    --wav2vec_dir 'weights/chinese-wav2vec2-base' \
+    --input_json examples/multitalk_example_tts_1.json \
+    --sample_steps 40 \
+    --mode streaming \
+    --num_persistent_param_in_dit 0 \
+    --use_teacache \
+    --save_file multi_long_lowvram_tts_exp \
+    --audio_mode tts
+```
+
+
+#### 3. Run with FusioniX and CausVid(Require only 4~8 steps)
+
+[FusioniX](https://huggingface.co/vrgamedevgirl84/Wan14BT2VFusioniX/blob/main/FusionX_LoRa/Wan2.1_I2V_14B_FusionX_LoRA.safetensors) require 8 steps and [lightx2v](https://huggingface.co/Kijai/WanVideo_comfy/blob/main/Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32.safetensors) requires only 4 steps.
+
+```
+python generate_multitalk.py \
+    --ckpt_dir weights/Wan2.1-I2V-14B-480P \
+    --wav2vec_dir 'weights/chinese-wav2vec2-base' \
+    --input_json examples/single_example_1.json \
+    --lora_dir weights/Wan2.1_I2V_14B_FusionX_LoRA.safetensors \
+    --lora_scale 1.0 \
+    --sample_text_guide_scale 1.0 \
+    --sample_audio_guide_scale 1.0 \
+    --sample_steps 8 \
+    --mode streaming \
+    --num_persistent_param_in_dit 0 \
+    --save_file single_long_lowvram_fusionx_exp \
+    --sample_shift 2
+```
+
+or 
+
+```
+python generate_multitalk.py \
+    --ckpt_dir weights/Wan2.1-I2V-14B-480P \
+    --wav2vec_dir 'weights/chinese-wav2vec2-base' \
+    --input_json examples/multitalk_example_2.json \
+    --lora_dir weights/Wan2.1_I2V_14B_FusionX_LoRA.safetensors \
+    --lora_scale 1.0 \
+    --sample_text_guide_scale 1.0 \
+    --sample_audio_guide_scale 1.0 \
+    --sample_steps 8 \
+    --mode streaming \
+    --num_persistent_param_in_dit 0 \
+    --save_file multi_long_lowvram_fusionx_exp \
+    --sample_shift 2
+```
+
+#### 4. Run with Gradio
+
+
+
+```
+python app.py \
+    --lora_dir weights/Wan2.1_I2V_14B_FusionX_LoRA.safetensors \
+    --lora_scale 1.0 \
+    --num_persistent_param_in_dit 0 \
+    --sample_shift 2
+```
+
+or
+
+```
+python app.py --num_persistent_param_in_dit 0 
+```
+
 
 ## 🚀Computational Efficiency
 The results are evaluated on A100 GPUs for multi-person generation. Single-person generation uses less memory and provides faster inference.

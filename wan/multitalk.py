@@ -1,5 +1,6 @@
 # Copyright 2024-2025 The Alibaba Wan Team Authors. All rights reserved.
 import gc
+from inspect import ArgSpec
 import logging
 import math
 import importlib
@@ -27,7 +28,8 @@ from .modules.t5 import T5EncoderModel, T5LayerNorm, T5RelativeEmbedding
 from .modules.vae import WanVAE, CausalConv3d, RMS_norm, Upsample
 from .utils.multitalk_utils import MomentumBuffer, adaptive_projected_guidance
 from src.vram_management import AutoWrappedLinear, AutoWrappedModule, enable_vram_management
-
+from wan.utils.utils import load_torch_file, standardize_lora_key_format, load_lora_for_models, apply_lora
+from wan.wan_lora import WanLoraWrapper
 
 def torch_gc():
     torch.cuda.empty_cache()
@@ -102,7 +104,9 @@ class MultiTalkPipeline:
         t5_cpu=False,
         init_on_cpu=True,
         num_timesteps=1000,
-        use_timestep_transform=True
+        use_timestep_transform=True,
+        lora_dir=None,
+        lora_scales=None
     ):
         r"""
         Initializes the image-to-video generation model components.
@@ -162,7 +166,16 @@ class MultiTalkPipeline:
         logging.info(f"Creating WanModel from {checkpoint_dir}")
         self.model = WanModel.from_pretrained(checkpoint_dir)
         self.model.eval().requires_grad_(False)
+        
+        
+        if lora_dir is not None:
+            lora_wrapper = WanLoraWrapper(self.model)
+            for lora_path, lora_scale in zip(lora_dir, lora_scales):
+                lora_name = lora_wrapper.load_lora(lora_path)
+                lora_wrapper.apply_lora(lora_name, lora_scale)
 
+
+    
 
         if t5_fsdp or dit_fsdp or use_usp:
             init_on_cpu = False
@@ -502,9 +515,8 @@ class MultiTalkPipeline:
                     background_mask = torch.zeros([src_h, src_w])
                     human_mask1 = torch.zeros([src_h, src_w])
                     human_mask2 = torch.zeros([src_h, src_w])
-                    src_w = src_w//2
-                    lefty_min, lefty_max = int(src_w * face_scale), int(src_w * (1 - face_scale))
-                    righty_min, righty_max = int(src_w * face_scale + src_w), int(src_w * (1 - face_scale) + src_w)
+                    lefty_min, lefty_max = int((src_w//2) * face_scale), int((src_w//2) * (1 - face_scale))
+                    righty_min, righty_max = int((src_w//2) * face_scale + (src_w//2)), int((src_w//2) * (1 - face_scale) + (src_w//2))
                     human_mask1[x_min:x_max, lefty_min:lefty_max] = 1
                     human_mask2[x_min:x_max, righty_min:righty_max] = 1
                     background_mask += human_mask1
